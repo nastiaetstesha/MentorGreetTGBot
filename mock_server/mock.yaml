@@ -1,0 +1,26 @@
+- request:
+    method: GET
+    path: /mentors
+  response:
+    status: 200
+    body: |
+      {
+        "mentors": [
+          {"id": 1, "name": {"first": "Евгений", "second": "Devman"}, "tg_username": "@eugene_dev", "tg_chat_id": 41878799, "bday": "1991-02-23"},
+          {"id": 2, "name": {"first": "Ильмир", "second": "Devman"}, "tg_username": "@ilmir_dev", "tg_chat_id": 6467718221}
+        ]
+      }
+
+- request:
+    method: GET
+    path: /postcards
+  response:
+    status: 200
+    body: |
+      {
+        "postcards": [
+          {"id": 1, "holidayId": "01.01", "name_ru": "Новый год", "body": "🎉✨С Новым годом!"},
+          {"id": 6, "holidayId": "birthday", "name_ru": "День рождения", "body": "🎂🎉 #name, С Днём рождения!"}
+        ]
+      }
+# jj --port 8080 --use-matchers mock.yaml

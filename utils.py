@@ -5,7 +5,8 @@ import requests
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext
 
-API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
+# API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
+API_BASE_URL = "http://127.0.0.1:8000"
 
 
 def fetch_data(endpoint):
@@ -13,8 +14,10 @@ def fetch_data(endpoint):
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        if isinstance(data, dict):
-            return data
+        if endpoint == "postcards":
+            return data.get("postcards", [])
+        if endpoint == "mentors":
+            return data.get("mentors", [])
     return []
 
 
@@ -54,7 +57,7 @@ def shorten_name(name):
 
 
 def get_cards_keyboard(cards):
-    keyboard = [[card["name"]] for card in cards]
+    keyboard = [[card["name_ru"]] for card in cards]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
@@ -65,7 +68,7 @@ def start(update: Update, context: CallbackContext):
 
 
 def show_mentors(update: Update, context: CallbackContext):
-    mentors = fetch_data("mentors")["mentors"]
+    mentors = fetch_data("mentors") # ["mentors"]
 
     if not isinstance(mentors, list) or not all(isinstance(m, dict) for m in mentors):
         update.message.reply_text("Ошибка загрузки данных. Попробуйте позже.")
@@ -116,12 +119,48 @@ def select_mentor(update: Update, context: CallbackContext):
 
 
 def select_card(update: Update, context: CallbackContext):
+    if "selected_mentor" not in context.user_data:
+        update.message.reply_text("Сначала выбери ментора.")
+        return
+
     cards = context.bot_data.get("cards", [])
-    selected_mentor = context.user_data.get("selected_mentor")
-    if update.message.text in [c["name"] for c in cards] and selected_mentor:
-        selected_card = next(c for c in cards if c["name"] == update.message.text)
-        update.message.reply_text(f"Ты выбрал открытку '{selected_card['name']}' для {selected_mentor}! {selected_card['body']}",
-                                  reply_markup=ReplyKeyboardRemove())
+    selected_mentor = context.user_data["selected_mentor"]
+    selected_text = update.message.text
+
+    selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
+
+    if selected_card:
+        body = selected_card["body"].replace("#name", selected_mentor)
+        update.message.reply_text(
+            f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
+            reply_markup=ReplyKeyboardRemove()
+        )
         context.user_data.pop("selected_mentor", None)
     else:
         update.message.reply_text("Выбери открытку из списка.")
+
+
+
+
+'''
+def select_card(update: Update, context: CallbackContext):
+    cards = context.bot_data.get("cards", [])
+    selected_mentor = context.user_data.get("selected_mentor")
+
+    if not selected_mentor:
+        update.message.reply_text("Сначала выбери ментора.")
+        return
+
+    selected_text = update.message.text
+    selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
+
+    if selected_card:
+        body = selected_card["body"].replace("#name", selected_mentor)
+        update.message.reply_text(
+            f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        context.user_data.pop("selected_mentor", None)
+    else:
+        update.message.reply_text("Выбери открытку из списка.")
+'''

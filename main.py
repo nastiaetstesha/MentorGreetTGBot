@@ -6,7 +6,6 @@ from telegram import Bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from dotenv import load_dotenv
 from utils import load_json, start, show_mentors, select_mentor, select_card, fetch_data
-from utils2 import show_mentors2
 
 
 if __name__ == "__main__":
@@ -35,7 +34,10 @@ if __name__ == "__main__":
     
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text("📜 Список менторов"), show_mentors))
+    
+
     dp.add_handler(MessageHandler(Filters.text, select_mentor))
+    
     dp.add_handler(MessageHandler(Filters.text, select_card))
 
     '''

@@ -6,6 +6,7 @@ import requests
 API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
 # https://my-json-server.typicode.com/devmanorg/congrats-mentor/mentors
 
+
 def fetch_data(endpoint):
     url = f"{API_BASE_URL}/{endpoint}"
     response = requests.get(url)
@@ -15,4 +16,6 @@ def fetch_data(endpoint):
             return data
     return []
 
-print(fetch_data("mentors"))
+
+# print(fetch_data("mentors"))
+print(fetch_data("postcards"))
