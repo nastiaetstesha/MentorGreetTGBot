@@ -31,13 +31,13 @@ if __name__ == "__main__":
     dp.bot_data["mentors"] = mentors
     dp.bot_data["cards"] = postcards
 
-    
+
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text("📜 Список менторов"), show_mentors))
     
 
     dp.add_handler(MessageHandler(Filters.text, select_mentor))
-    
+
     dp.add_handler(MessageHandler(Filters.text, select_card))
 
     '''
