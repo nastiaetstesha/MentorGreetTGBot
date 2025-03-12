@@ -53,7 +53,7 @@ def get_unique_mentor_display(mentors):
 
 def shorten_name(name):
     words = name.split()
-    return " ".join(words[:2]) + "..." if len(words) > 2 else name
+    return words[1] + " " + words[-1] + "..." if len(words) > 2 else name
 
 
 def get_cards_keyboard(cards):
@@ -70,7 +70,7 @@ def start(update: Update, context: CallbackContext):
 def show_mentors(update: Update, context: CallbackContext):
     mentors = fetch_data("mentors") # ["mentors"]
 
-    if not isinstance(mentors, list) or not all(isinstance(m, dict) for m in mentors):
+    if not isinstance(mentors, list) or not all(isinstance(m, dict) for m in mentors) or isinstance(mentors, list) and not mentors[0]:
         update.message.reply_text("Ошибка загрузки данных. Попробуйте позже.")
         return
 

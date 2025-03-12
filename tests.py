@@ -2,6 +2,10 @@ import json
 import os
 import requests
 
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import CallbackContext
+
+
 
 # API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
 # https://my-json-server.typicode.com/devmanorg/congrats-mentor/mentors
@@ -94,6 +98,8 @@ def select_card(update: Update, context: CallbackContext):
     else:
         update.message.reply_text("Выбери открытку из списка.")
 
+a = fetch_data("mentors")
 
-# print(fetch_data("mentors"))
+for m in a:
+    print(m.split())
 # print(fetch_data("postcards"))
