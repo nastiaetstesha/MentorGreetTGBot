@@ -84,6 +84,14 @@ def show_mentors(update: Update, context: CallbackContext):
         )
 
 
+def process_user_message(update: Update, context: CallbackContext):    
+    # Если в контексте есть состояние "выбор открытки", передаём сообщение в select_card
+    if context.user_data.get("state") == "choosing_card":
+        select_card(update, context)
+    else:
+        select_mentor(update, context)
+
+
 def select_mentor(update: Update, context: CallbackContext):
     mentors = context.bot_data.get("mentors", [])
     selected_text = update.message.text
@@ -110,48 +118,30 @@ def select_mentor(update: Update, context: CallbackContext):
         context.user_data["selected_mentor"] = get_mentor_full_name(selected_mentor)
         cards = fetch_data("postcards")
         context.bot_data["cards"] = cards
+
         update.message.reply_text(
             f"Ты выбрал {get_mentor_full_name(selected_mentor)}. Теперь выбери открытку:",
             reply_markup=get_cards_keyboard(cards)
         )
+
+        # После выбора ментора переключаем состояние на "выбор открытки"
+        context.user_data["state"] = "choosing_card"
+
     else:
         update.message.reply_text("Выбери ментора из списка.")
 
 
 def select_card(update: Update, context: CallbackContext):
-    if "selected_mentor" not in context.user_data:
-        update.message.reply_text("Сначала выбери ментора.")
+    
+    # Если состояние не "выбор открытки", значит, что-то пошло не так → возвращаем в select_mentor
+    if context.user_data.get("state") != "choosing_card":
+        select_mentor(update, context)
         return
 
-    cards = context.bot_data.get("cards", [])
-    selected_mentor = context.user_data["selected_mentor"]
-    selected_text = update.message.text
-
-    selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
-
-    if selected_card:
-        body = selected_card["body"].replace("#name", selected_mentor)
-        update.message.reply_text(
-            f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        context.user_data.pop("selected_mentor", None)
-    else:
-        update.message.reply_text("Выбери открытку из списка.")
-
-
-
-
-'''
-def select_card(update: Update, context: CallbackContext):
     cards = context.bot_data.get("cards", [])
     selected_mentor = context.user_data.get("selected_mentor")
-
-    if not selected_mentor:
-        update.message.reply_text("Сначала выбери ментора.")
-        return
-
     selected_text = update.message.text
+
     selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
 
     if selected_card:
@@ -160,7 +150,11 @@ def select_card(update: Update, context: CallbackContext):
             f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
             reply_markup=ReplyKeyboardRemove()
         )
+
+        # Сбрасываем состояние, так как выбор завершён
         context.user_data.pop("selected_mentor", None)
+        context.user_data.pop("state", None)
     else:
         update.message.reply_text("Выбери открытку из списка.")
-'''
+
+
