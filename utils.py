@@ -5,10 +5,80 @@ import requests
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext
 
+import jsonschema
+from jsonschema import validate
+
 # API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
 API_BASE_URL = "http://127.0.0.1:8080"
 
+mentors_schema = {
+    "type": "object",
+    "properties": {
+        "mentors": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {
+                        "type": "object",
+                        "properties": {
+                            "first": {"type": "string"},
+                            "second": {"type": "string"}
+                        },
+                        "required": ["first", "second"]
+                    },
+                    "tg_username": {"type": "string"},
+                    "tg_chat_id": {"type": "integer"},
+                    "bday": {"type": "string", "format": "date"}
+                },
+                "required": ["id", "name", "tg_username", "tg_chat_id"]
+            }
+        }
+    },
+    "required": ["mentors"]
+}
 
+postcards_schema = {
+    "type": "object",
+    "properties": {
+        "postcards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "holidayId": {"type": "string"},
+                    "name_ru": {"type": "string"},
+                    "body": {"type": "string"}
+                },
+                "required": ["id", "holidayId", "name_ru", "body"]
+            }
+        }
+    },
+    "required": ["postcards"]
+}
+
+
+def validate_json(response_json, schema):
+    try:
+        validate(instance=response_json, schema=schema)
+        print("JSON соответствует схеме API")
+    except jsonschema.exceptions.ValidationError as e:
+        print(f"Ошибка валидации JSON: {e}")
+
+
+def fetch_and_validate(endpoint, schema):
+    url = f"{API_BASE_URL}/{endpoint}"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        response_json = response.json()
+        validate_json(response_json, schema)
+    else:
+        print(f"Ошибка запроса: {response.status_code}")
+
+        
 def fetch_data(endpoint):
     url = f"{API_BASE_URL}/{endpoint}"
     response = requests.get(url)

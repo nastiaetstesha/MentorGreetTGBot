@@ -5,7 +5,7 @@ import requests
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from dotenv import load_dotenv
-from utils import load_json, start, show_mentors, fetch_data, process_user_message
+from utils import load_json, start, show_mentors, fetch_data, process_user_message, fetch_and_validate, mentors_schema, postcards_schema
 
 
 if __name__ == "__main__":
@@ -25,8 +25,11 @@ if __name__ == "__main__":
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
 
-    mentors = fetch_data("mentors")
-    postcards = fetch_data("postcards")
+    # mentors = fetch_data("mentors")
+    # postcards = fetch_data("postcards")
+    
+    mentors = fetch_and_validate("mentors", mentors_schema)
+    postcards = fetch_and_validate("postcards", postcards_schema)
 
     dp.bot_data["mentors"] = mentors
     dp.bot_data["cards"] = postcards
