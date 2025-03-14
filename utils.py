@@ -11,6 +11,13 @@ from jsonschema import validate
 # API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
 API_BASE_URL = "http://127.0.0.1:8080"
 
+
+# Самописное исключение ServerError
+class ServerError(Exception):
+    """Ошибка сервера при получении и валидации данных API"""
+    pass
+
+
 mentors_schema = {
     "type": "object",
     "properties": {
@@ -89,20 +96,42 @@ def validate_json(response_json, schema):
         validate(instance=response_json, schema=schema)
         print("JSON соответствует схеме API")
     except jsonschema.exceptions.ValidationError as e:
-        print(f"Ошибка валидации JSON: {e}")
+        raise ServerError("Ошибка валидации ответа от сервера") from e
 
 
-def fetch_and_validate(endpoint, schema):
+def fetch_and_validate(endpoint, schema, update: Update = None, context: CallbackContext = None):
     url = f"{API_BASE_URL}/{endpoint}"
-    response = requests.get(url)
     
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, timeout=5)
+
+        if response.status_code != 200:
+            raise ServerError(f"Ошибка сервера: статус {response.status_code}")
+        
         response_json = response.json()
         validate_json(response_json, schema)
+        
         return response_json
-    else:
-        print(f"Ошибка запроса: {response.status_code}")
-        return {} 
+
+    except ServerError as e:
+        print(f"Ошибка сервера: {e}")
+        if update and context:
+            handle_server_error(update, context)
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка сети: {e}")
+        if update and context:
+            handle_server_error(update, context)
+        return None
+    except json.JSONDecodeError:
+        print("Ошибка парсинга JSON")
+        if update and context:
+            handle_server_error(update, context)
+        return None
+
+
+def handle_server_error(update: Update, context: CallbackContext):
+    update.message.reply_text("🚨 Произошла ошибка на сервере. Попробуйте позже.")
 
 
 def fetch_data(endpoint):
