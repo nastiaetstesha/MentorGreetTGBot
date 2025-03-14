@@ -60,6 +60,30 @@ postcards_schema = {
 }
 
 
+def check_role(update: Update, context: CallbackContext):
+    """Определяет роль пользователя."""
+    user = update.message.from_user
+    selected_role = update.message.text
+    mentors = context.bot_data.get("mentors", [])
+
+    if selected_role == "Я Ментор":
+        # Проверяем, есть ли этот пользователь в списке менторов
+        for mentor in mentors:
+            if mentor.get("tg_username") == f"@{user.username}":
+                context.user_data["role"] = "mentor"
+                update.message.reply_text("Вы ментор. Теперь вы можете получать поздравления!", 
+                                          reply_markup=ReplyKeyboardRemove())
+                return
+
+        # Если никнейм не найден среди менторов
+        update.message.reply_text("Вы не зарегистрированы как ментор.", reply_markup=ReplyKeyboardRemove())
+        return
+
+    elif selected_role == "Я Ученик":
+        context.user_data["role"] = "student"
+        show_mentors(update, context)
+
+
 def validate_json(response_json, schema):
     try:
         validate(instance=response_json, schema=schema)
@@ -75,10 +99,12 @@ def fetch_and_validate(endpoint, schema):
     if response.status_code == 200:
         response_json = response.json()
         validate_json(response_json, schema)
+        return response_json
     else:
         print(f"Ошибка запроса: {response.status_code}")
+        return {} 
 
-        
+
 def fetch_data(endpoint):
     url = f"{API_BASE_URL}/{endpoint}"
     response = requests.get(url)
@@ -132,9 +158,11 @@ def get_cards_keyboard(cards):
 
 
 def start(update: Update, context: CallbackContext):
-    keyboard = [["📜 Список менторов"]]
-    update.message.reply_text("Привет! Нажми кнопку, чтобы увидеть список менторов.",
-                              reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True))
+    keyboard = [["Я Ментор"], ["Я Ученик"]]
+    update.message.reply_text(
+        "Привет! Выберите вашу роль:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    )
 
 
 def show_mentors(update: Update, context: CallbackContext):
@@ -155,7 +183,17 @@ def show_mentors(update: Update, context: CallbackContext):
 
 
 def process_user_message(update: Update, context: CallbackContext):    
-    # Если в контексте есть состояние "выбор открытки", передаём сообщение в select_card
+    # Если роль еще не выбрана, вызываем check_role
+    if "role" not in context.user_data:
+        check_role(update, context)
+        return
+
+    # Если роль — "mentor", значит, он не должен выбирать открытки
+    if context.user_data.get("role") == "mentor":
+        update.message.reply_text("Вы ментор и принимаете открытки, а не выбираете их.")
+        return
+
+    # Если состояние — выбор открытки, запускаем select_card
     if context.user_data.get("state") == "choosing_card":
         select_card(update, context)
     else:

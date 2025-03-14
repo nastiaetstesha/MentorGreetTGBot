@@ -28,8 +28,8 @@ if __name__ == "__main__":
     # mentors = fetch_data("mentors")
     # postcards = fetch_data("postcards")
     
-    mentors = fetch_and_validate("mentors", mentors_schema)
-    postcards = fetch_and_validate("postcards", postcards_schema)
+    mentors = fetch_and_validate("mentors", mentors_schema).get("mentors", [])
+    postcards = fetch_and_validate("postcards", postcards_schema).get("postcards", [])
 
     dp.bot_data["mentors"] = mentors
     dp.bot_data["cards"] = postcards

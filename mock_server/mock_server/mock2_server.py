@@ -11,7 +11,7 @@ async def run_mock_server():
         status=200,
         body=json.dumps({
             "mentors": [
-                {"id": 1, "name": {"first": "Гений", "second": "Devman"}, "tg_username": "@eugene_dev", "tg_chat_id": 41878799, "bday": "1991-02-23"},
+                {"id": 1, "name": {"first": "Гений", "second": "Devman"}, "tg_username": "@steshaet", "tg_chat_id": 41878799, "bday": "1991-02-23"},
                 {"id": 2, "name": {"first": "Ильмир", "second": "Devman"}, "tg_username": "@ilmir_dev", "tg_chat_id": 6467718221},
                 {"id": 3, "name": {"first": "Ильмир", "second": "Devman"}, "tg_username": "@nurbek_dev", "tg_chat_id": 335075762, "bday": "1991-02-23"},
                 {"id": 4, "name": {"first": "Катя", "second": "Иванова"}, "tg_username": "@katie", "tg_chat_id": 335000000},
