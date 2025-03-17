@@ -1,43 +1,36 @@
 import logging
 import os
-import requests
-
+from dotenv import load_dotenv
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from dotenv import load_dotenv
-from utils import load_json, start, show_mentors, fetch_data, process_user_message, fetch_and_validate, mentors_schema, postcards_schema
 
+from utils import start, show_mentors, process_user_message, handle_server_error
+from api_client import fetch_mentors, fetch_postcards, ServerError
 
 if __name__ == "__main__":
     load_dotenv()
 
     token = os.getenv("TG_TOKEN")
     bot = Bot(token=token)
-    '''   
-    MENTORS_FILE = "mentors.json"
-    POSTCARDS_FILE = "postcards.json"
-    
-    mentors = load_json(MENTORS_FILE)
-    postcards = load_json(POSTCARDS_FILE)
-    '''
+
     logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
     updater = Updater(token, use_context=True)
     dp = updater.dispatcher
 
-    # mentors = fetch_data("mentors")
-    # postcards = fetch_data("postcards")
-    
-    mentors = fetch_and_validate("mentors", mentors_schema, "mentors")
-    postcards = fetch_and_validate("postcards", postcards_schema, "postcards")
+    try:
+        mentors = fetch_mentors()
+        postcards = fetch_postcards()
 
-    dp.bot_data["mentors"] = mentors
-    dp.bot_data["cards"] = postcards
-
+        dp.bot_data["mentors"] = mentors
+        dp.bot_data["cards"] = postcards
+    except ServerError:
+        logger.error("Ошибка при получении данных с сервера 001")
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text("📜 Список менторов"), show_mentors))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, process_user_message))
-    
+
     updater.start_polling()
     updater.idle()
