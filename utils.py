@@ -1,35 +1,74 @@
-import json
-import os
-import requests
-
+import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext
-
-API_BASE_URL = "https://my-json-server.typicode.com/devmanorg/congrats-mentor"
-
-
-def fetch_data(endpoint):
-    url = f"{API_BASE_URL}/{endpoint}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        if isinstance(data, dict):
-            return data
-    return []
+from api_client import fetch_mentors, fetch_postcards, ServerError
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def load_json(filename):
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def get_mentor_full_name(mentor):
-    return f'{mentor["name"]["first"]} {mentor["name"]["second"]}'
+def handle_server_error(update: Update, context: CallbackContext):
+    """Сообщает пользователю об ошибке на сервере."""
+    update.message.reply_text("🚨 Произошла ошибка на сервере. Попробуйте позже.")
+
+
+def check_role(update: Update, context: CallbackContext):
+    """Определяет роль пользователя после выбора кнопки 'Я Ментор' или 'Я Ученик'."""
+    user = update.message.from_user
+    selected_role = update.message.text
+
+    try:
+        mentors = context.bot_data.get("mentors", [])
+        
+        if selected_role == "Я Ментор":
+            for mentor in mentors:
+                if mentor.get("tg_username") == f"@{user.username}":
+                    context.user_data["role"] = "mentor"
+                    update.message.reply_text("Вы ментор. Теперь вы можете получать поздравления!", 
+                                              reply_markup=ReplyKeyboardRemove())
+                    return
+
+            update.message.reply_text("Вы не зарегистрированы как ментор.", reply_markup=ReplyKeyboardRemove())
+            return
+
+        elif selected_role == "Я Ученик":
+            context.user_data["role"] = "student"
+            show_mentors(update, context)
+
+    except Exception as e:
+        logger.error(f"Ошибка при проверке роли: {e}")
+        handle_server_error(update, context)
+
+
+def start(update: Update, context: CallbackContext):
+    """Стартовый диалог с выбором роли."""
+    context.user_data.pop("role", None)
+    keyboard = [["Я Ментор"], ["Я Ученик"]]
+    update.message.reply_text(
+        "Привет! Выберите вашу роль:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    )
+
+
+def show_mentors(update: Update, context: CallbackContext):
+    """Отправляет пользователю список менторов."""
+    try:
+        mentors = fetch_mentors()
+        context.bot_data["mentors"] = mentors
+
+        if not mentors:
+            update.message.reply_text("Список менторов пуст. Попробуйте позже.")
+        else:
+            update.message.reply_text("Выбери ментора из списка:", reply_markup=get_unique_mentor_display(mentors))
+    
+    except ServerError:
+        handle_server_error(update, context)
 
 
 def get_unique_mentor_display(mentors):
+    """Создаёт клавиатуру с именами менторов."""
     name_counts = {}
     for mentor in mentors:
         full_name = get_mentor_full_name(mentor)
@@ -39,49 +78,51 @@ def get_unique_mentor_display(mentors):
     for mentor in mentors:
         full_name = get_mentor_full_name(mentor)
         name_part = shorten_name(full_name)
-        if name_counts[full_name] == 1:
-            display_name = name_part
-        else:
-            display_name = f"{name_part} ({mentor['tg_username']})"
+        display_name = name_part if name_counts[full_name] == 1 else f"{name_part} ({mentor['tg_username']})"
         keyboard.append([display_name])
 
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
+def get_mentor_full_name(mentor):
+    """Возвращает полное имя ментора."""
+    return f'{mentor["name"]["first"]} {mentor["name"]["second"]}'
+
+
 def shorten_name(name):
+    """Сокращает имя для удобства отображения."""
     words = name.split()
-    return " ".join(words[:2]) + "..." if len(words) > 2 else name
+    return words[1] + " " + words[-1] + "..." if len(words) > 2 else name
+
+
+def process_user_message(update: Update, context: CallbackContext):
+    """Определяет, какая функция должна быть вызвана после получения сообщения."""
+    try:
+        if "role" not in context.user_data:
+            check_role(update, context)
+            return
+
+        if context.user_data.get("role") == "mentor":
+            update.message.reply_text("Вы ментор и принимаете открытки, а не выбираете их.")
+            return
+
+        if context.user_data.get("state") == "choosing_card":
+            select_card(update, context)
+        else:
+            select_mentor(update, context)
+
+    except Exception as e:
+        logger.error(f"Ошибка при обработке сообщения: {e}")
+        handle_server_error(update, context)
 
 
 def get_cards_keyboard(cards):
-    keyboard = [[card["name"]] for card in cards]
+    keyboard = [[card["name_ru"]] for card in cards]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
-def start(update: Update, context: CallbackContext):
-    keyboard = [["📜 Список менторов"]]
-    update.message.reply_text("Привет! Нажми кнопку, чтобы увидеть список менторов.",
-                              reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True))
-
-
-def show_mentors(update: Update, context: CallbackContext):
-    mentors = fetch_data("mentors")["mentors"]
-
-    if not isinstance(mentors, list) or not all(isinstance(m, dict) for m in mentors):
-        update.message.reply_text("Ошибка загрузки данных. Попробуйте позже.")
-        return
-
-    if not mentors:
-        update.message.reply_text("Список менторов пуст. Пожалуйста, попробуйте позже.")
-    else:
-        context.bot_data["mentors"] = mentors
-        update.message.reply_text(
-            "Выбери ментора из списка:",
-            reply_markup=get_unique_mentor_display(mentors)
-        )
-
-
 def select_mentor(update: Update, context: CallbackContext):
+    """Позволяет ученику выбрать ментора."""
     mentors = context.bot_data.get("mentors", [])
     selected_text = update.message.text
 
@@ -105,23 +146,80 @@ def select_mentor(update: Update, context: CallbackContext):
 
     if selected_mentor:
         context.user_data["selected_mentor"] = get_mentor_full_name(selected_mentor)
-        cards = fetch_data("postcards")
-        context.bot_data["cards"] = cards
-        update.message.reply_text(
-            f"Ты выбрал {get_mentor_full_name(selected_mentor)}. Теперь выбери открытку:",
-            reply_markup=get_cards_keyboard(cards)
-        )
+        update.message.reply_text(f"Ты выбрал {get_mentor_full_name(selected_mentor)}.")
+        context.user_data["state"] = "choosing_card"
+        select_card(update, context)
     else:
         update.message.reply_text("Выбери ментора из списка.")
 
 
-def select_card(update: Update, context: CallbackContext):
-    cards = context.bot_data.get("cards", [])
+def confirm_card_selection(update: Update, context: CallbackContext):
+    """Обрабатывает подтверждение открытки перед отправкой."""
+    query = update.callback_query
+    query.answer()
+
     selected_mentor = context.user_data.get("selected_mentor")
-    if update.message.text in [c["name"] for c in cards] and selected_mentor:
-        selected_card = next(c for c in cards if c["name"] == update.message.text)
-        update.message.reply_text(f"Ты выбрал открытку '{selected_card['name']}' для {selected_mentor}! {selected_card['body']}",
-                                  reply_markup=ReplyKeyboardRemove())
+    selected_card = context.user_data.get("selected_card")
+
+    if selected_card and selected_mentor:
+        body = selected_card["body"].replace("#name", selected_mentor)
+        query.message.reply_text(
+            f"Ты отправил открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
+            reply_markup=ReplyKeyboardRemove()
+        )
+
         context.user_data.pop("selected_mentor", None)
+        context.user_data.pop("selected_card", None)
+        context.user_data.pop("state", None)
     else:
-        update.message.reply_text("Выбери открытку из списка.")
+        query.message.reply_text("Произошла ошибка. Попробуйте снова.")
+
+
+def cancel_card_selection(update: Update, context: CallbackContext):
+    """Отменяет выбор открытки и возвращает к списку открыток."""
+    query = update.callback_query
+    query.answer()
+
+    query.message.reply_text("Выбери другую открытку:", reply_markup=get_cards_keyboard(context.bot_data.get("cards", [])))
+
+
+def select_card(update: Update, context: CallbackContext):
+    """Позволяет пользователю выбрать открытку, но перед отправкой показывает текст."""
+    try:
+        if context.user_data.get("state") != "choosing_card":
+            select_mentor(update, context)
+            return
+
+        cards = context.bot_data.get("cards", [])
+
+        if not cards:
+            update.message.reply_text("Список открыток пуст. Попробуйте позже.",
+                                      reply_markup=ReplyKeyboardRemove())
+            context.user_data.pop("selected_mentor", None)
+            context.user_data.pop("state", None)
+            return
+
+        selected_mentor = context.user_data.get("selected_mentor")
+        selected_text = update.message.text
+
+        selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
+
+        if selected_card:
+            body = selected_card["body"].replace("#name", selected_mentor)
+            context.user_data["selected_card"] = selected_card
+
+            keyboard = [
+                [InlineKeyboardButton(" Отправить", callback_data="confirm_card")],
+                [InlineKeyboardButton(" Выбрать другую", callback_data="cancel_card")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            update.message.reply_text(
+                f"Ты выбрал открытку '{selected_card['name_ru']}'. Вот её текст:\n\n{body}\n\nОтправить её?",
+                reply_markup=reply_markup
+            )
+        else:
+            update.message.reply_text("Выбери открытку из списка:", reply_markup=get_cards_keyboard(cards))
+
+    except ServerError:
+        handle_server_error(update, context)

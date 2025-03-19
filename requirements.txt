@@ -1,0 +1,12 @@
+python-telegram-bot==13.15
+requests==2.32.3
+aiohttp==3.11.13
+jj==2.11.1
+sh==2.2.2
+jsonschema==4.23.0
+pydantic==2.10.6
+python-dotenv==1.0.1
+attrs==25.1.0
+rtry==1.5.0
+pytz==2025.1
+tzlocal==5.3
