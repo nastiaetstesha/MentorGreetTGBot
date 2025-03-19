@@ -145,7 +145,7 @@ def select_mentor(update: Update, context: CallbackContext):
     if selected_mentor:
         context.user_data["selected_mentor"] = get_mentor_full_name(selected_mentor)
         update.message.reply_text(f"Ты выбрал {get_mentor_full_name(selected_mentor)}.")
-        
+        context.user_data["state"] = "choosing_card"
         select_card(update, context)
     else:
         update.message.reply_text("Выбери ментора из списка.")
@@ -153,19 +153,36 @@ def select_mentor(update: Update, context: CallbackContext):
 
 def select_card(update: Update, context: CallbackContext):
     """Позволяет пользователю выбрать открытку для ментора."""
-    if "selected_mentor" not in context.user_data:
-        update.message.reply_text("Сначала выбери ментора.")
-        return
+    try:
+        if context.user_data.get("state") != "choosing_card":
+            select_mentor(update, context)
+            return
 
-    cards = fetch_postcards()
-    context.bot_data["cards"] = cards
+        cards = context.bot_data.get("cards", [])
 
-    if not cards:
-        update.message.reply_text("Список открыток пуст. Попробуйте позже.", reply_markup=ReplyKeyboardRemove())
-        context.user_data.pop("selected_mentor", None)
-        return
+        if not cards:
+            update.message.reply_text("Список открыток пуст. Попробуйте позже.",
+                                      reply_markup=ReplyKeyboardRemove())
+            context.user_data.pop("selected_mentor", None)
+            context.user_data.pop("state", None)
+            return
 
-    update.message.reply_text("Теперь выбери открытку:", reply_markup=get_cards_keyboard(cards))
+        selected_mentor = context.user_data.get("selected_mentor")
+        selected_text = update.message.text
 
-    context.user_data["state"] = "choosing_card"
+        selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
 
+        if selected_card:
+            body = selected_card["body"].replace("#name", selected_mentor)
+            update.message.reply_text(f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
+                                      reply_markup=ReplyKeyboardRemove())
+            context.user_data.pop("selected_mentor", None)
+            context.user_data.pop("state", None)
+        else:
+            update.message.reply_text(
+                "Выбери открытку из списка:",
+                reply_markup=get_cards_keyboard(cards)
+            )
+
+    except ServerError:
+        handle_server_error(update, context)
