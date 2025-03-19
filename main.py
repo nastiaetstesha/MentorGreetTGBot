@@ -2,9 +2,9 @@ import logging
 import os
 from dotenv import load_dotenv
 from telegram import Bot
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-from utils import start, show_mentors, process_user_message, handle_server_error
+from utils import start, show_mentors, process_user_message, handle_server_error, confirm_card_selection, cancel_card_selection
 from api_client import fetch_mentors, fetch_postcards, ServerError
 
 if __name__ == "__main__":
@@ -31,6 +31,8 @@ if __name__ == "__main__":
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text("📜 Список менторов"), show_mentors))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, process_user_message))
+    dp.add_handler(CallbackQueryHandler(confirm_card_selection, pattern="confirm_card"))
+    dp.add_handler(CallbackQueryHandler(cancel_card_selection, pattern="cancel_card"))
 
     updater.start_polling()
     updater.idle()

@@ -2,6 +2,8 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackContext
 from api_client import fetch_mentors, fetch_postcards, ServerError
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -151,8 +153,38 @@ def select_mentor(update: Update, context: CallbackContext):
         update.message.reply_text("Выбери ментора из списка.")
 
 
+def confirm_card_selection(update: Update, context: CallbackContext):
+    """Обрабатывает подтверждение открытки перед отправкой."""
+    query = update.callback_query
+    query.answer()
+
+    selected_mentor = context.user_data.get("selected_mentor")
+    selected_card = context.user_data.get("selected_card")
+
+    if selected_card and selected_mentor:
+        body = selected_card["body"].replace("#name", selected_mentor)
+        query.message.reply_text(
+            f"Ты отправил открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
+            reply_markup=ReplyKeyboardRemove()
+        )
+
+        context.user_data.pop("selected_mentor", None)
+        context.user_data.pop("selected_card", None)
+        context.user_data.pop("state", None)
+    else:
+        query.message.reply_text("Произошла ошибка. Попробуйте снова.")
+
+
+def cancel_card_selection(update: Update, context: CallbackContext):
+    """Отменяет выбор открытки и возвращает к списку открыток."""
+    query = update.callback_query
+    query.answer()
+
+    query.message.reply_text("Выбери другую открытку:", reply_markup=get_cards_keyboard(context.bot_data.get("cards", [])))
+
+
 def select_card(update: Update, context: CallbackContext):
-    """Позволяет пользователю выбрать открытку для ментора."""
+    """Позволяет пользователю выбрать открытку, но перед отправкой показывает текст."""
     try:
         if context.user_data.get("state") != "choosing_card":
             select_mentor(update, context)
@@ -174,15 +206,20 @@ def select_card(update: Update, context: CallbackContext):
 
         if selected_card:
             body = selected_card["body"].replace("#name", selected_mentor)
-            update.message.reply_text(f"Ты выбрал открытку '{selected_card['name_ru']}' для {selected_mentor}!\n\n{body}",
-                                      reply_markup=ReplyKeyboardRemove())
-            context.user_data.pop("selected_mentor", None)
-            context.user_data.pop("state", None)
-        else:
+            context.user_data["selected_card"] = selected_card
+
+            keyboard = [
+                [InlineKeyboardButton(" Отправить", callback_data="confirm_card")],
+                [InlineKeyboardButton(" Выбрать другую", callback_data="cancel_card")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
             update.message.reply_text(
-                "Выбери открытку из списка:",
-                reply_markup=get_cards_keyboard(cards)
+                f"Ты выбрал открытку '{selected_card['name_ru']}'. Вот её текст:\n\n{body}\n\nОтправить её?",
+                reply_markup=reply_markup
             )
+        else:
+            update.message.reply_text("Выбери открытку из списка:", reply_markup=get_cards_keyboard(cards))
 
     except ServerError:
         handle_server_error(update, context)
