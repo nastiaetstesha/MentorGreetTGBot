@@ -1,8 +1,17 @@
 import logging
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
-from api_client import fetch_mentors, fetch_postcards, ServerError
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+from api_client import (
+    fetch_mentors,
+    fetch_postcards,
+    APIConnectionError,
+    APIHTTPError,
+    APIParsingError,
+    APIValidationError,
+    APIClientError
+)
 
 
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +23,7 @@ def handle_server_error(update: Update, context: CallbackContext):
     update.message.reply_text("🚨 Произошла ошибка на сервере. Попробуйте позже.")
 
 
-def check_role(update: Update, context: CallbackContext):
+def handle_role_selection(update: Update, context: CallbackContext):
     """Определяет роль пользователя после выбора кнопки 'Я Ментор' или 'Я Ученик'."""
     user = update.message.from_user
     selected_role = update.message.text
@@ -63,7 +72,9 @@ def show_mentors(update: Update, context: CallbackContext):
         else:
             update.message.reply_text("Выбери ментора из списка:", reply_markup=get_unique_mentor_display(mentors))
     
-    except ServerError:
+    except APIValidationError:
+        handle_server_error(update, context)
+    except (APIConnectionError, APIHTTPError, APIParsingError, APIClientError):
         handle_server_error(update, context)
 
 
@@ -92,14 +103,16 @@ def get_mentor_full_name(mentor):
 def shorten_name(name):
     """Сокращает имя для удобства отображения."""
     words = name.split()
-    return words[1] + " " + words[-1] + "..." if len(words) > 2 else name
+    if len(words) > 2:
+        return f"{words[1]} {words[-1]}..."
+    return name
 
 
 def process_user_message(update: Update, context: CallbackContext):
     """Определяет, какая функция должна быть вызвана после получения сообщения."""
     try:
         if "role" not in context.user_data:
-            check_role(update, context)
+            handle_role_selection(update, context)
             return
 
         if context.user_data.get("role") == "mentor":
@@ -221,5 +234,7 @@ def select_card(update: Update, context: CallbackContext):
         else:
             update.message.reply_text("Выбери открытку из списка:", reply_markup=get_cards_keyboard(cards))
 
-    except ServerError:
+    except APIValidationError:
+        handle_server_error(update, context)
+    except (APIConnectionError, APIHTTPError, APIParsingError, APIClientError):
         handle_server_error(update, context)

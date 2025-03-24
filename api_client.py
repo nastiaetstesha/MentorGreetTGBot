@@ -1,10 +1,14 @@
-import requests
-import logging
 import jsonschema
+import logging
+import os
+import requests
+
+from dotenv import load_dotenv
 from jsonschema import validate
 
-# Базовый URL для API
-API_BASE_URL = "http://127.0.0.1:8080"
+
+load_dotenv()
+API_BASE_URL = os.getenv("API_BASE_URL")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,16 +62,32 @@ postcards_schema = {
 }
 
 
-class ServerError(Exception):
-    """Ошибка сервера при получении и валидации данных API"""
+class APIClientError(Exception):
+    """Базовое исключение клиента API"""
+    pass
+
+
+class APIConnectionError(APIClientError):
+    """Ошибка подключения к серверу"""
+    pass
+
+
+class APIHTTPError(APIClientError):
+    """Сервер вернул ошибку HTTP"""
+    pass
+
+
+class APIParsingError(APIClientError):
+    """Ошибка парсинга JSON"""
+    pass
+
+
+class APIValidationError(APIClientError):
+    """Ошибка валидации полученного JSON по схеме"""
     pass
 
 
 def fetch_data(endpoint):
-    """
-    Получает данные с сервера по `endpoint`.
-    Возвращает JSON-ответ или выбрасывает исключение.
-    """
     url = f"{API_BASE_URL}/{endpoint}"
     
     try:
@@ -75,24 +95,30 @@ def fetch_data(endpoint):
         response.raise_for_status()
         return response.json()
     
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка сети при запросе {url}: {e}")
-        raise ServerError(f"Ошибка соединения с сервером") from e
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Ошибка подключения при запросе {url}: {e}")
+        raise APIConnectionError("Не удалось подключиться к серверу") from e
+
     except requests.exceptions.HTTPError as e:
-        logger.error(f"Ошибка HTTP {response.status_code} при запросе {url}")
-        raise ServerError(f"Ошибка на сервере: статус {response.status_code}") from e
+        logger.error(f"HTTP {response.status_code} при запросе {url}: {e}")
+        raise APIHTTPError(f"Сервер вернул ошибку: {response.status_code}") from e
+
     except requests.exceptions.JSONDecodeError as e:
-        logger.error(f"Ошибка парсинга JSON при запросе {url}")
-        raise ServerError("Некорректный JSON-ответ") from e
+        logger.error(f"Ошибка разбора JSON при запросе {url}: {e}")
+        raise APIParsingError("Ошибка разбора JSON-ответа") from e
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Сетевая ошибка при запросе {url}: {e}")
+        raise APIClientError("Общая ошибка API-клиента") from e
 
 
 def fetch_mentors():
     """Запрашивает список менторов с сервера и валидирует данные."""
     try:
         data = fetch_data("mentors")
-        validate_json(data, mentors_schema) 
+        validate_json(data, mentors_schema)
         return data.get("mentors", [])
-    except ServerError as e:
+    except APIClientError as e:
         logger.error(f"Ошибка при загрузке менторов: {e}")
         return []
 
@@ -103,7 +129,7 @@ def fetch_postcards():
         data = fetch_data("postcards")
         validate_json(data, postcards_schema)
         return data.get("postcards", [])
-    except ServerError as e:
+    except APIClientError as e:
         logger.error(f"Ошибка при загрузке открыток: {e}")
         return []
 
@@ -115,7 +141,8 @@ def validate_json(response_json, schema):
     """
     try:
         validate(instance=response_json, schema=schema)
-        logger.info("JSON успешно прошёл валидацию")
+        logger.info("JSON успешно прошёл валидацию по схеме.")
     except jsonschema.exceptions.ValidationError as e:
-        logger.error(f"Ошибка валидации JSON: {e}")
-        raise ServerError("Ошибка валидации данных от сервера") from e
+        logger.error(f"Ошибка валидации: {e}")
+        raise APIValidationError("Данные не соответствуют схеме API") from e
+

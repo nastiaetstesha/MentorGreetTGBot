@@ -1,13 +1,15 @@
 import logging
 import os
+
 from dotenv import load_dotenv
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
+from api_client import fetch_mentors, fetch_postcards, APIConnectionError
 from utils import start, show_mentors, process_user_message, handle_server_error, confirm_card_selection, cancel_card_selection
-from api_client import fetch_mentors, fetch_postcards, ServerError
 
-if __name__ == "__main__":
+
+def main():
     load_dotenv()
 
     token = os.getenv("TG_TOKEN")
@@ -25,7 +27,7 @@ if __name__ == "__main__":
 
         dp.bot_data["mentors"] = mentors
         dp.bot_data["cards"] = postcards
-    except ServerError:
+    except APIConnectionError:
         logger.error("Ошибка при получении данных с сервера 001")
 
     dp.add_handler(CommandHandler("start", start))
@@ -36,3 +38,7 @@ if __name__ == "__main__":
 
     updater.start_polling()
     updater.idle()
+
+
+if __name__ == "__main__":
+    main()
