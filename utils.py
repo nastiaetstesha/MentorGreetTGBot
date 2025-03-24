@@ -129,8 +129,14 @@ def process_user_message(update: Update, context: CallbackContext):
         handle_server_error(update, context)
 
 
+# def get_cards_keyboard(cards):
+#     keyboard = [[card["name_ru"]] for card in cards]
+#     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 def get_cards_keyboard(cards):
-    keyboard = [[card["name_ru"]] for card in cards]
+    keyboard = []
+    for card in cards:
+        display = f"{card['name_ru']} #{card['id']}"
+        keyboard.append([display])
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
@@ -213,9 +219,11 @@ def select_card(update: Update, context: CallbackContext):
             return
 
         selected_mentor = context.user_data.get("selected_mentor")
-        selected_text = update.message.text
+        selected_text = update.message.text.strip()
 
-        selected_card = next((c for c in cards if c["name_ru"] == selected_text), None)
+        selected_id = int(selected_text.split("#")[-1]) if "#" in selected_text else None
+
+        selected_card = next((card for card in cards if card["id"] == selected_id), None)
 
         if selected_card:
             body = selected_card["body"].replace("#name", selected_mentor)
