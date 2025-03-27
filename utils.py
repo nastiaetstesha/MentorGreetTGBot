@@ -1,11 +1,15 @@
 import logging
 
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    Update,
+)
 from telegram.ext import CallbackContext
-
 from api_client import (
     fetch_mentors,
-    fetch_postcards,
     APIConnectionError,
     APIHTTPError,
     APIParsingError,
@@ -39,7 +43,8 @@ def handle_role_selection(update: Update, context: CallbackContext):
                                               reply_markup=ReplyKeyboardRemove())
                     return
 
-            update.message.reply_text("Вы не зарегистрированы как ментор.", reply_markup=ReplyKeyboardRemove())
+            update.message.reply_text("Вы не зарегистрированы как ментор.",
+                                      reply_markup=ReplyKeyboardRemove())
             return
 
         elif selected_role == "Я Ученик":
@@ -57,7 +62,9 @@ def start(update: Update, context: CallbackContext):
     keyboard = [["Я Ментор"], ["Я Ученик"]]
     update.message.reply_text(
         "Привет! Выберите вашу роль:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup(keyboard,
+                                         resize_keyboard=True,
+                                         one_time_keyboard=True)
     )
 
 
@@ -70,7 +77,8 @@ def show_mentors(update: Update, context: CallbackContext):
         if not mentors:
             update.message.reply_text("Список менторов пуст. Попробуйте позже.")
         else:
-            update.message.reply_text("Выбери ментора из списка:", reply_markup=get_unique_mentor_display(mentors))
+            update.message.reply_text("Выбери ментора из списка:",
+                                      reply_markup=get_unique_mentor_display(mentors))
     
     except APIValidationError:
         handle_server_error(update, context)
@@ -92,7 +100,8 @@ def get_unique_mentor_display(mentors):
         display_name = name_part if name_counts[full_name] == 1 else f"{name_part} ({mentor['tg_username']})"
         keyboard.append([display_name])
 
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True,
+                               one_time_keyboard=True)
 
 
 def get_mentor_full_name(mentor):
@@ -129,15 +138,14 @@ def process_user_message(update: Update, context: CallbackContext):
         handle_server_error(update, context)
 
 
-# def get_cards_keyboard(cards):
-#     keyboard = [[card["name_ru"]] for card in cards]
-#     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 def get_cards_keyboard(cards):
     keyboard = []
     for card in cards:
         display = f"{card['name_ru']} #{card['id']}"
         keyboard.append([display])
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard,
+                               resize_keyboard=True,
+                               one_time_keyboard=True)
 
 
 def select_mentor(update: Update, context: CallbackContext):
@@ -199,7 +207,10 @@ def cancel_card_selection(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
-    query.message.reply_text("Выбери другую открытку:", reply_markup=get_cards_keyboard(context.bot_data.get("cards", [])))
+    query.message.reply_text("Выбери другую открытку:",
+                             reply_markup=get_cards_keyboard(
+                                 context.bot_data.get("cards", [])
+                                 ))
 
 
 def select_card(update: Update, context: CallbackContext):
@@ -240,7 +251,8 @@ def select_card(update: Update, context: CallbackContext):
                 reply_markup=reply_markup
             )
         else:
-            update.message.reply_text("Выбери открытку из списка:", reply_markup=get_cards_keyboard(cards))
+            update.message.reply_text("Выбери открытку из списка:",
+                                      reply_markup=get_cards_keyboard(cards))
 
     except APIValidationError:
         handle_server_error(update, context)
