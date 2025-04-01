@@ -1,16 +1,12 @@
 import jsonschema
 import logging
-import os
 import requests
 
-from dotenv import load_dotenv
 from jsonschema import validate
 
 
-load_dotenv()
-API_BASE_URL = os.getenv("API_BASE_URL")
+API_BASE_URL = None
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 mentors_schema = {
@@ -87,21 +83,28 @@ class APIValidationError(APIClientError):
     pass
 
 
+def set_api_base_url(url):
+    global API_BASE_URL
+    API_BASE_URL = url
+
+
 def fetch_data(endpoint):
     url = f"{API_BASE_URL}/{endpoint}"
-    
+
     try:
         response = requests.get(url, timeout=5)
         response.raise_for_status()
         return response.json()
-    
+
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Ошибка подключения при запросе {url}: {e}")
         raise APIConnectionError("Не удалось подключиться к серверу") from e
 
     except requests.exceptions.HTTPError as e:
         logger.error(f"HTTP {response.status_code} при запросе {url}: {e}")
-        raise APIHTTPError(f"Сервер вернул ошибку: {response.status_code}") from e
+        raise APIHTTPError(
+            f"Сервер вернул ошибку: {response.status_code}"
+            ) from e
 
     except requests.exceptions.JSONDecodeError as e:
         logger.error(f"Ошибка разбора JSON при запросе {url}: {e}")
@@ -145,4 +148,3 @@ def validate_json(response_json, schema):
     except jsonschema.exceptions.ValidationError as e:
         logger.error(f"Ошибка валидации: {e}")
         raise APIValidationError("Данные не соответствуют схеме API") from e
-

@@ -2,7 +2,6 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from telegram import Bot
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -15,6 +14,7 @@ from api_client import (
     fetch_mentors,
     fetch_postcards,
     APIConnectionError,
+    set_api_base_url,
 )
 from utils import (
     start,
@@ -29,7 +29,8 @@ def main():
     load_dotenv()
 
     token = os.getenv("TG_TOKEN")
-    bot = Bot(token=token)
+    api_url = os.getenv("API_BASE_URL", "http://127.0.0.1:8080")
+    set_api_base_url(api_url)
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

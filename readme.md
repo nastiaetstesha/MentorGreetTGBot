@@ -28,7 +28,7 @@ pip install -r requirements.txt
 TG_TOKEN=your_telegram_bot_token
 API_BASE_URL=https://your-api-url.com
 ```
-
+По умолчанию API_BASE_URL=http://127.0.0.1:8080
 ## 📜 Структура проекта
 ```
 project_root/
